@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Traffic Management</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Smart Traffic Management</h1>
+        <div class="main-content">
+            <div class="simulation-container">
+                <canvas id="trafficCanvas"></canvas>
+            </div>
+            <div class="controls-and-data">
+                <div class="controls">
+                    <h2>Controls</h2>
+                    <button id="startStopBtn">Start/Stop</button>
+                    <button id="addCarBtn">Add Car</button>
+                    <button id="resetBtn">Reset</button>
+                </div>
+                <div class="data-dashboard">
+                    <h2>Real-time Data</h2>
+                    <div class="data-item">
+                        <span class="label">Total Vehicles:</span>
+                        <span id="vehicleCount">0</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="label">Average Speed:</span>
+                        <span id="avgSpeed">0 km/h</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="label">Average Wait Time:</span>
+                        <span id="avgWaitTime">0s</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="simulation.js"></script>
+</body>
+</html>
