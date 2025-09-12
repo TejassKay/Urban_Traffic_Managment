@@ -1,369 +1,303 @@
-window.addEventListener('DOMContentLoaded', () => {
-    const canvas = document.getElementById('trafficCanvas');
-    if (!canvas) {
-        console.error("Canvas element not found!");
-        return;
+ const nsLights = document.querySelectorAll("#ns-light .light");
+    const ewLights = document.querySelectorAll("#ew-light .light");
+    const statusText = document.getElementById("status");
+    const timerDisplay = document.getElementById("timer");
+    const nsDemandDisplay = document.getElementById("ns-demand");
+    const ewDemandDisplay = document.getElementById("ew-demand");
+    
+    const northDensityDisplay = document.getElementById("north-density");
+    const southDensityDisplay = document.getElementById("south-density");
+    const eastDensityDisplay = document.getElementById("east-density");
+    const westDensityDisplay = document.getElementById("west-density");
+    
+    const predictButton = document.getElementById("predictButton");
+
+    // ---------------------------------
+    // AI INTEGRATION - Connect to Flask
+    // ---------------------------------
+    async function fetchPrediction(nsVehicles, ewVehicles) {
+      try {
+        const response = await fetch('http://127.0.0.1:5000/predict_time', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vehicles: nsVehicles }) // For simplicity, only sending one variable
+        });
+        const data = await response.json();
+        console.log(`AI predicted green time: ${data.green_time}`);
+        return data.green_time;
+      } catch (error) {
+        console.error('Error fetching AI prediction:', error);
+        return 10; // Default time in case of error
+      }
     }
+    
+    predictButton.addEventListener('click', async () => {
+        const nsVehicles = cars.filter(c => c.lane === 'north' || c.lane === 'south').length;
+        const newTime = await fetchPrediction(nsVehicles);
+        phases[0].time = Math.round(newTime);
+        console.log(`Updated NS green phase to ${phases[0].time} seconds.`);
+        currentPhase = 0;
+        updateLights();
+    });
+
+    // ---------------------------------
+    // TRAFFIC SIMULATION - Canvas
+    // ---------------------------------
+    const canvas = document.getElementById('simulationCanvas');
     const ctx = canvas.getContext('2d');
+    const gridSize = 10;
+    const roadWidth = 80;
+    
+    let cars = [];
+    let nsStopped = false;
+    let ewStopped = false;
+    
+    // Set canvas dimensions dynamically for responsive design
+    function resizeCanvas() {
+        canvas.width = window.innerWidth * 0.7; // 70% of screen width
+        canvas.height = canvas.width; // Square canvas
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
 
-    // Set canvas size
-    const canvasWidth = 800;
-    const canvasHeight = 600;
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
+    // Car object to manage each vehicle's state
+    function Car(lane) {
+      this.lane = lane;
+      this.speed = 1.5;
+      this.x = 0;
+      this.y = 0;
+      this.color = `hsl(${Math.random() * 360}, 70%, 50%)`;
+      this.width = 10;
+      this.height = 15;
 
-    // Simulation variables
-    let vehicles = [];
-    let intersections = [];
-    let simulationRunning = true;
-    let roads = {
-        vertical: [],
-        horizontal: []
-    };
-    const VEHICLE_TYPES = {
-        CAR: { width: 14, height: 26, name: 'car' },
-        TRUCK: { width: 16, height: 35, name: 'truck' },
-        BUS: { width: 16, height: 45, name: 'bus' }
-    };
-    const VEHICLE_COLORS = ['#ff6b6b', '#f0e68c', '#87ceeb', '#98fb98', '#dda0dd', '#ff7f50'];
-    const LANE_OFFSET = 15;
-
-
-    // DOM Elements
-    const vehicleCountEl = document.getElementById('vehicleCount');
-    const avgSpeedEl = document.getElementById('avgSpeed');
-    const avgWaitTimeEl = document.getElementById('avgWaitTime');
-    const startStopBtn = document.getElementById('startStopBtn');
-    const addCarBtn = document.getElementById('addCarBtn');
-    const resetBtn = document.getElementById('resetBtn');
-
-
-    // --- Classes ---
-    class Vehicle {
-        constructor(x, y, speed, direction, type, color) {
-            this.x = x;
-            this.y = y;
-            this.speed = speed;
-            this.direction = direction; // 'N', 'S', 'E', 'W'
-            this.type = type;
-            this.color = color;
-            this.width = type.width;
-            this.height = type.height;
-            this.waitTime = 0;
-        }
-
-        draw() {
-            ctx.save();
-            ctx.translate(this.x, this.y);
-
-            let angle = 0;
-            if (this.direction === 'E') angle = Math.PI / 2;
-            else if (this.direction === 'S') angle = Math.PI;
-            else if (this.direction === 'W') angle = -Math.PI / 2;
-
-            ctx.rotate(angle);
-
-            // Vehicle Body
-            ctx.fillStyle = this.color;
-            ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
-            
-            // Windshield
-            ctx.fillStyle = 'rgba(200, 230, 255, 0.8)';
-            ctx.fillRect(-this.width / 2, -this.height / 2, this.width, 5);
-
-            // Truck/Bus Cab
-            if (this.type.name !== 'car') {
-                ctx.fillStyle = 'rgba(50, 50, 50, 0.5)';
-                ctx.fillRect(-this.width / 2, -this.height / 2 + 7, this.width, 6);
-            }
-
-            ctx.restore();
-        }
-
-        move() {
-            switch (this.direction) {
-                case 'N': this.y -= this.speed; break;
-                case 'S': this.y += this.speed; break;
-                case 'E': this.x += this.speed; break;
-                case 'W': this.x -= this.speed; break;
-            }
-
-            // Wrap around canvas edges
-            if (this.y < -this.height) this.y = canvasHeight + this.height;
-            else if (this.y > canvasHeight + this.height) this.y = -this.height;
-            else if (this.x < -this.width) this.x = canvasWidth + this.width;
-            else if (this.x > canvasWidth + this.width) this.x = -this.width;
-        }
+      // Set initial position based on lane
+      if (this.lane === 'north') { this.x = canvas.width / 2 + gridSize; this.y = -this.height; }
+      if (this.lane === 'south') { this.x = canvas.width / 2 - gridSize - this.width; this.y = canvas.height + this.height; }
+      if (this.lane === 'east') { this.x = canvas.width + this.width; this.y = canvas.height / 2 + gridSize; }
+      if (this.lane === 'west') { this.x = -this.width; this.y = canvas.height / 2 - gridSize - this.height; }
     }
 
-    class Intersection {
-        constructor(x, y) {
-            this.x = x;
-            this.y = y;
-            this.width = 60;
-            this.height = 60;
-            this.isNSGreen = true; // North-South is green by default
-            
-            // --- SMART SYSTEM PROPERTIES ---
-            this.minGreenTime = 180; // Minimum time a light stays green (3 seconds at 60fps)
-            this.greenTimeTimer = 0;
-            this.northboundDemand = 0;
-            this.southboundDemand = 0;
-            this.eastboundDemand = 0;
-            this.westboundDemand = 0;
-        }
+    // Update car positions and add collision avoidance
+    function updateCars() {
+      const stopDistance = 20;
 
-        draw() {
-            // Draw traffic lights
-            const lightSize = 6;
-            const lightOffset = 8;
-            ctx.fillStyle = this.isNSGreen ? '#28a745' : '#dc3545';
-            ctx.beginPath();
-            ctx.arc(this.x, this.y - this.height / 2 - lightOffset, lightSize, 0, Math.PI * 2);
-            ctx.arc(this.x, this.y + this.height / 2 + lightOffset, lightSize, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = !this.isNSGreen ? '#28a745' : '#dc3545';
-            ctx.beginPath();
-            ctx.arc(this.x - this.width / 2 - lightOffset, this.y, lightSize, 0, Math.PI * 2);
-            ctx.arc(this.x + this.width / 2 + lightOffset, this.y, lightSize, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        
-        // --- THE "BRAIN" OF THE SMART SYSTEM ---
-        update(allVehicles) {
-            this.detectTraffic(allVehicles);
-            this.greenTimeTimer++;
+      cars.forEach(car => {
+        let isStopped = false;
 
-            // Only consider switching if the minimum green time has passed
-            if (this.greenTimeTimer < this.minGreenTime) {
-                return;
-            }
+        // Check for intersection stop
+        if (car.lane === 'north' && car.y > canvas.height/2 - roadWidth/2 - car.height && nsStopped) isStopped = true;
+        if (car.lane === 'south' && car.y < canvas.height/2 + roadWidth/2 + car.height && nsStopped) isStopped = true;
+        if (car.lane === 'east' && car.x < canvas.width/2 + roadWidth/2 + car.width && ewStopped) isStopped = true;
+        if (car.lane === 'west' && car.x > canvas.width/2 - roadWidth/2 - car.width && ewStopped) isStopped = true;
 
-            const nsTotalDemand = this.northboundDemand + this.southboundDemand;
-            const ewTotalDemand = this.eastboundDemand + this.westboundDemand;
-
-            // Decision logic: switch if the other direction has more demand
-            if (this.isNSGreen && ewTotalDemand > nsTotalDemand) {
-                this.isNSGreen = false;
-                this.greenTimeTimer = 0; // Reset timer on switch
-            } else if (!this.isNSGreen && nsTotalDemand > ewTotalDemand) {
-                this.isNSGreen = true;
-                this.greenTimeTimer = 0; // Reset timer on switch
-            }
-            // If demand is equal, or the current green direction has more demand, do nothing.
-        }
-        
-        // --- THE "EYES" OF THE SMART SYSTEM ---
-        detectTraffic(allVehicles) {
-            // Reset demand counts for each frame
-            this.northboundDemand = 0;
-            this.southboundDemand = 0;
-            this.eastboundDemand = 0;
-            this.westboundDemand = 0;
-            const detectionZone = 250; // How far the "sensors" can see
-
-            for (const vehicle of allVehicles) {
-                const isWaiting = vehicle.waitTime > 0;
-                
-                // Southbound vehicles (approaching from the north)
-                if(vehicle.direction === 'S' && vehicle.y < this.y && (this.y - vehicle.y) < detectionZone) {
-                    this.southboundDemand += isWaiting ? 5 : 1; // Prioritize waiting cars
-                }
-                // Northbound vehicles (approaching from the south)
-                else if (vehicle.direction === 'N' && vehicle.y > this.y && (vehicle.y - this.y) < detectionZone) {
-                    this.northboundDemand += isWaiting ? 5 : 1;
-                }
-                // Eastbound vehicles (approaching from the west)
-                else if (vehicle.direction === 'E' && vehicle.x < this.x && (this.x - vehicle.x) < detectionZone) {
-                    this.eastboundDemand += isWaiting ? 5 : 1;
-                }
-                // Westbound vehicles (approaching from the east)
-                else if (vehicle.direction === 'W' && vehicle.x > this.x && (vehicle.x - this.x) < detectionZone) {
-                    this.westboundDemand += isWaiting ? 5 : 1;
+        // Check for car-to-car collision
+        if (!isStopped) {
+            for (let otherCar of cars) {
+                if (otherCar !== car && otherCar.lane === car.lane) {
+                    if (car.lane === 'north' && (car.y > otherCar.y - stopDistance && car.y < otherCar.y)) isStopped = true;
+                    if (car.lane === 'south' && (car.y < otherCar.y + stopDistance && car.y > otherCar.y)) isStopped = true;
+                    if (car.lane === 'east' && (car.x < otherCar.x + stopDistance && car.x > otherCar.x)) isStopped = true;
+                    if (car.lane === 'west' && (car.x > otherCar.x - stopDistance && car.x < otherCar.x)) isStopped = true;
                 }
             }
         }
-    }
-
-
-    // --- Functions ---
-    function init() {
-        vehicles = [];
-        intersections = [];
-        roads.vertical = [];
-        roads.horizontal = [];
-
-        const roadX = canvasWidth / 2;
-        const roadY = canvasHeight / 2;
-
-        roads.vertical.push(roadX);
-        roads.horizontal.push(roadY);
-        intersections.push(new Intersection(roadX, roadY));
-
-        for (let i = 0; i < 15; i++) {
-            addVehicle();
-        }
-
-        if (!simulationRunning) {
-            startStopBtn.textContent = 'Start';
-        } else { 
-            gameLoop();
-        }
-    }
-
-    function addVehicle() {
-        const directions = ['N', 'S', 'E', 'W'];
-        const direction = directions[Math.floor(Math.random() * directions.length)];
-        const speed = 1 + Math.random();
-        let x, y;
-
-        const randType = Math.random();
-        let type;
-        if (randType < 0.7) type = VEHICLE_TYPES.CAR;
-        else if (randType < 0.9) type = VEHICLE_TYPES.TRUCK;
-        else type = VEHICLE_TYPES.BUS;
         
-        const color = VEHICLE_COLORS[Math.floor(Math.random() * VEHICLE_COLORS.length)];
-
-        // Assign vehicles to strict lanes
-        switch(direction) {
-            case 'N':
-                x = roads.vertical[0] + LANE_OFFSET;
-                y = canvasHeight + type.height;
-                break;
-            case 'S':
-                x = roads.vertical[0] - LANE_OFFSET;
-                y = -type.height;
-                break;
-            case 'E':
-                x = -type.width;
-                y = roads.horizontal[0] + LANE_OFFSET;
-                break;
-            case 'W':
-                x = canvasWidth + type.width;
-                y = roads.horizontal[0] - LANE_OFFSET;
-                break;
+        // Move car if not stopped
+        if (!isStopped) {
+            if (car.lane === 'north') car.y += car.speed;
+            if (car.lane === 'south') car.y -= car.speed;
+            if (car.lane === 'east') car.x -= car.speed;
+            if (car.lane === 'west') car.x += car.speed;
         }
+      });
+      
+      // Remove cars that have left the screen
+      cars = cars.filter(car => 
+        car.x > -car.width && car.x < canvas.width + car.width &&
+        car.y > -car.height && car.y < canvas.height + car.height
+      );
+    }
+    
+    // Function to get demand based on the simulation
+    function getTrafficDemand() {
+        const nsCars = cars.filter(car => car.lane === 'north' || car.lane === 'south');
+        const ewCars = cars.filter(car => car.lane === 'east' || car.lane === 'west');
+        return { ns: nsCars.length, ew: ewCars.length };
+    }
+
+    // Function to get density based on the simulation
+    function getTrafficDensity() {
+        const nsCarsCount = cars.filter(car => car.lane === 'north' || car.lane === 'south').length;
+        const ewCarsCount = cars.filter(car => car.lane === 'east' || car.lane === 'west').length;
+        return {
+            north: nsCarsCount > 15 ? 'High' : nsCarsCount > 5 ? 'Medium' : 'Low',
+            south: nsCarsCount > 15 ? 'High' : nsCarsCount > 5 ? 'Medium' : 'Low',
+            east: ewCarsCount > 15 ? 'High' : ewCarsCount > 5 ? 'Medium' : 'Low',
+            west: ewCarsCount > 15 ? 'High' : ewCarsCount > 5 ? 'Medium' : 'Low'
+        };
+    }
+
+    // Draw the simulation
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw roads
+      ctx.fillStyle = '#1e2125';
+      ctx.fillRect(0, canvas.height / 2 - roadWidth / 2, canvas.width, roadWidth);
+      ctx.fillRect(canvas.width / 2 - roadWidth / 2, 0, roadWidth, canvas.height);
+
+      // Draw dashed lines
+      ctx.strokeStyle = '#e6edf3';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(canvas.width / 2, 0);
+      ctx.lineTo(canvas.width / 2, canvas.height / 2 - roadWidth / 2);
+      ctx.moveTo(canvas.width / 2, canvas.height / 2 + roadWidth / 2);
+      ctx.lineTo(canvas.width / 2, canvas.height);
+      ctx.moveTo(0, canvas.height / 2);
+      ctx.lineTo(canvas.width / 2 - roadWidth / 2, canvas.height / 2);
+      ctx.moveTo(canvas.width / 2 + roadWidth / 2, canvas.height / 2);
+      ctx.lineTo(canvas.width, canvas.height / 2);
+      ctx.stroke();
+
+      // Draw traffic lights
+      drawTrafficLight(canvas.width / 2 - roadWidth / 2 - 30, canvas.height / 2 - roadWidth / 2 - 80, phases[currentPhase].ns); // North
+      drawTrafficLight(canvas.width / 2 + roadWidth / 2 + 10, canvas.height / 2 + roadWidth / 2 + 10, phases[currentPhase].ns); // South
+      drawTrafficLight(canvas.width / 2 + roadWidth / 2 + 10, canvas.height / 2 - roadWidth / 2 - 80, phases[currentPhase].ew); // East
+      drawTrafficLight(canvas.width / 2 - roadWidth / 2 - 30, canvas.height / 2 + roadWidth / 2 + 10, phases[currentPhase].ew); // West
+
+
+      // Draw cars
+      cars.forEach(car => {
+        ctx.fillStyle = car.color;
+        ctx.beginPath();
+        if (car.lane === 'north' || car.lane === 'south') {
+            ctx.rect(car.x, car.y, car.width, car.height);
+        } else {
+            ctx.rect(car.x, car.y, car.height, car.width);
+        }
+        ctx.fill();
+      });
+
+      // Spawn new cars based on a random chance
+      if (Math.random() < 0.01) cars.push(new Car('north'));
+      if (Math.random() < 0.01) cars.push(new Car('south'));
+      if (Math.random() < 0.01) cars.push(new Car('east'));
+      if (Math.random() < 0.01) cars.push(new Car('west'));
+    }
+
+    // Function to draw a traffic light on the canvas
+    function drawTrafficLight(x, y, color) {
+        ctx.fillStyle = '#1e2125';
+        ctx.fillRect(x, y, 20, 50);
         
-        vehicles.push(new Vehicle(x, y, speed, direction, type, color));
+        ctx.beginPath();
+        ctx.arc(x + 10, y + 10, 5, 0, Math.PI * 2);
+        ctx.fillStyle = color === 'red' ? 'red' : '#333';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(x + 10, y + 25, 5, 0, Math.PI * 2);
+        ctx.fillStyle = color === 'yellow' ? 'yellow' : '#333';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(x + 10, y + 40, 5, 0, Math.PI * 2);
+        ctx.fillStyle = color === 'green' ? 'lime' : '#333';
+        ctx.fill();
     }
 
-    function drawUrbanSurroundings() {
-        // ... (Drawing code is unchanged)
-        ctx.fillStyle = '#4a576d'; 
-        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-        const roadWidth = 60;
-        const sidewalkWidth = 20;
-        const totalRoadWidth = roadWidth + sidewalkWidth * 2;
-        ctx.fillStyle = '#a0a0a0';
-        roads.vertical.forEach(x => { ctx.fillRect(x - totalRoadWidth / 2, 0, totalRoadWidth, canvasHeight); });
-        roads.horizontal.forEach(y => { ctx.fillRect(0, y - totalRoadWidth / 2, canvasWidth, totalRoadWidth); });
-        ctx.fillStyle = '#666'; 
-        roads.vertical.forEach(x => { ctx.fillRect(x - roadWidth / 2, 0, roadWidth, canvasHeight); });
-        roads.horizontal.forEach(y => { ctx.fillRect(0, y - roadWidth / 2, canvasWidth, roadWidth); });
-        ctx.fillStyle = '#333b4a';
-        ctx.fillRect(0, 0, roads.vertical[0] - totalRoadWidth / 2, roads.horizontal[0] - totalRoadWidth / 2);
-        ctx.fillRect(roads.vertical[0] + totalRoadWidth / 2, 0, canvasWidth, roads.horizontal[0] - totalRoadWidth / 2);
-        ctx.fillRect(0, roads.horizontal[0] + totalRoadWidth / 2, roads.vertical[0] - totalRoadWidth / 2, canvasHeight);
-        ctx.fillRect(roads.vertical[0] + totalRoadWidth / 2, roads.horizontal[0] + totalRoadWidth / 2, canvasWidth, canvasHeight);
-        ctx.strokeStyle = '#f0c14a';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([10, 15]);
-        roads.vertical.forEach(x => { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvasHeight); ctx.stroke(); });
-        roads.horizontal.forEach(y => { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvasWidth, y); ctx.stroke(); });
-        const intersection = intersections[0];
-        ctx.fillStyle = 'white';
-        ctx.setLineDash([]);
-        for(let i = -1; i <= 1; i += 2) {
-            for(let j = -1; j <= 1; j += 0.5) {
-                ctx.fillRect(intersection.x + (j * 10), intersection.y + (i * (roadWidth / 2 + 5)), 5, 10);
-                ctx.fillRect(intersection.x + (i * (roadWidth / 2 + 5)), intersection.y + (j * 10), 10, 5);
-            }
-        }
-    }
-
-    function updateDataDashboard() {
-        if (!vehicleCountEl) return;
-        vehicleCountEl.textContent = vehicles.length;
-        let totalSpeed = 0;
-        let waitingVehicles = 0;
-        let totalWaitTime = 0;
-        vehicles.forEach(v => {
-            totalSpeed += v.speed;
-            if (v.waitTime > 0) {
-                waitingVehicles++;
-                totalWaitTime += v.waitTime;
-            }
-        });
-        const avgSpeed = vehicles.length > 0 ? (totalSpeed / vehicles.length * 20).toFixed(1) : 0;
-        avgSpeedEl.textContent = `${avgSpeed} km/h`;
-        const avgWaitTime = waitingVehicles > 0 ? (totalWaitTime / waitingVehicles / 60).toFixed(2) : 0;
-        avgWaitTimeEl.textContent = `${avgWaitTime}s`;
-    }
-
+    // Main animation loop
     function gameLoop() {
-        if (simulationRunning) {
-            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-            drawUrbanSurroundings();
-
-            intersections.forEach(intersection => {
-                intersection.draw();
-                intersection.update(vehicles); // Pass vehicle data to the intersection's brain
-            });
-
-            vehicles.forEach((vehicle, index) => {
-                let isStoppedAtLight = false;
-                let isBlockedByCar = false;
-                const stopDistance = 45; 
-                const safeDistance = vehicle.height + 10;
-
-                const intersection = intersections[0];
-                const dx = vehicle.x - intersection.x;
-                const dy = vehicle.y - intersection.y;
-                
-                if (vehicle.direction === 'S' && !intersection.isNSGreen && dy > -stopDistance && dy < 0) isStoppedAtLight = true;
-                else if (vehicle.direction === 'N' && !intersection.isNSGreen && dy < stopDistance && dy > 0) isStoppedAtLight = true;
-                else if (vehicle.direction === 'E' && intersection.isNSGreen && dx > -stopDistance && dx < 0) isStoppedAtLight = true;
-                else if (vehicle.direction === 'W' && intersection.isNSGreen && dx < stopDistance && dx > 0) isStoppedAtLight = true;
-
-                for (let i = 0; i < vehicles.length; i++) {
-                    if (index === i) continue;
-                    const other = vehicles[i];
-                    if (vehicle.x === other.x || vehicle.y === other.y) {
-                         switch(vehicle.direction) {
-                             case 'S': if (other.y > vehicle.y && other.y - vehicle.y < safeDistance) isBlockedByCar = true; break;
-                             case 'N': if (other.y < vehicle.y && vehicle.y - other.y < safeDistance) isBlockedByCar = true; break;
-                             case 'E': if (other.x > vehicle.x && other.x - vehicle.x < safeDistance) isBlockedByCar = true; break;
-                             case 'W': if (other.x < vehicle.x && vehicle.x - other.x < safeDistance) isBlockedByCar = true; break;
-                         }
-                    }
-                }
-                
-                if (isStoppedAtLight || isBlockedByCar) {
-                    vehicle.waitTime++;
-                } else {
-                    vehicle.move();
-                    vehicle.waitTime = 0;
-                }
-                vehicle.draw();
-            });
-
-            updateDataDashboard();
-        }
-        requestAnimationFrame(gameLoop);
+      updateCars();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+    
+    // Start the game loop on window load.
+    window.onload = function () {
+        gameLoop();
     }
 
-    // --- Event Listeners ---
-    if(startStopBtn) {
-        startStopBtn.addEventListener('click', () => {
-            simulationRunning = !simulationRunning;
-            startStopBtn.textContent = simulationRunning ? 'Stop' : 'Start';
-            if(simulationRunning) { gameLoop(); }
-        });
-    }
-    if(addCarBtn) { addCarBtn.addEventListener('click', () => { addVehicle(); }); }
-    if(resetBtn) { resetBtn.addEventListener('click', () => { init(); }); }
 
-    // --- Start Simulation ---
-    init();
-});
+    // ---------------------------------
+    // TRAFFIC LIGHT CONTROL - Phases
+    // ---------------------------------
+    let phases = [
+      { id: "ns", ns: "green", ew: "red", text: "North/South Green - Go", time: 10 },
+      { id: "ns", ns: "yellow", ew: "red", text: "North/South Yellow - Ready", time: 3 },
+      { id: "ew", ns: "red", ew: "green", text: "East/West Green - Go", time: 10 },
+      { id: "ew", ns: "red", ew: "yellow", text: "East/West Yellow - Ready", time: 3 }
+    ];
+
+    let currentPhase = 0;
+    let timeLeft = phases[currentPhase].time;
+    let fetchingPrediction = false;
+
+    function updateLights() {
+      // Reset all lights
+      nsLights.forEach(light => light.classList.remove("active"));
+      ewLights.forEach(light => light.classList.remove("active"));
+
+      // Activate based on phase
+      nsLights.forEach(light => {
+        if (light.classList.contains(phases[currentPhase].ns)) light.classList.add("active");
+      });
+      ewLights.forEach(light => {
+        if (light.classList.contains(phases[currentPhase].ew)) light.classList.add("active");
+      });
+
+      // Update stop/go for the simulation
+      nsStopped = (phases[currentPhase].ns === 'red' || phases[currentPhase].ns === 'yellow');
+      ewStopped = (phases[currentPhase].ew === 'red' || phases[currentPhase].ew === 'yellow');
+
+      statusText.innerText = phases[currentPhase].text;
+      timeLeft = phases[currentPhase].time;
+    }
+
+    // Main timer to manage phases and trigger AI predictions
+    setInterval(async () => {
+      timeLeft--;
+      timerDisplay.innerText = timeLeft;
+
+      // Update simulation demand and density displays
+      const demand = getTrafficDemand();
+      nsDemandDisplay.innerText = demand.ns;
+      ewDemandDisplay.innerText = demand.ew;
+      const density = getTrafficDensity();
+      northDensityDisplay.innerText = density.north;
+      southDensityDisplay.innerText = density.south;
+      eastDensityDisplay.innerText = density.east;
+      westDensityDisplay.innerText = density.west;
+
+      if (timeLeft <= 0) {
+        currentPhase = (currentPhase + 1) % phases.length;
+        updateLights();
+      }
+      
+      // AI prediction logic. Only trigger on the first step of a new green phase
+      if (timeLeft === phases[currentPhase].time - 1 && !fetchingPrediction) {
+          if (phases[currentPhase].id === "ns") {
+              // Send NS traffic data to AI
+              const nsVehicles = cars.filter(c => c.lane === 'north' || c.lane === 'south').length;
+              console.log(`Sending AI NS traffic data: ${nsVehicles}`);
+              fetchingPrediction = true;
+              const newTime = await fetchPrediction(nsVehicles);
+              fetchingPrediction = false;
+              phases[currentPhase].time = Math.round(newTime); // Update the phase duration
+          } else if (phases[currentPhase].id === "ew") {
+              // Send EW traffic data to AI
+              const ewVehicles = cars.filter(c => c.lane === 'east' || c.lane === 'west').length;
+              console.log(`Sending AI EW traffic data: ${ewVehicles}`);
+              fetchingPrediction = true;
+              const newTime = await fetchPrediction(ewVehicles);
+              fetchingPrediction = false;
+              phases[currentPhase].time = Math.round(newTime); // Update the phase duration
+          }
+      }
+
+    }, 1000);
+
+    updateLights(); // Initialize the first light
+    fetchPredictionAndUpdatePhase();
