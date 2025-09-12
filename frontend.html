@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Traffic Intersection Simulation</title>
+<style>
+  body {
+    background: #111;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    color: #fff;
+    margin: 0;
+    padding: 0;
+  }
+
+  h1 { color: #00ffcc; margin: 20px; }
+
+  /* Intersection container */
+  #intersection {
+    position: relative;
+    width: 600px;
+    height: 600px;
+    margin: 0 auto;
+    background: #333;
+    border: 4px solid #555;
+  }
+
+  /* Roads */
+  .road-horizontal, .road-vertical {
+    position: absolute;
+    background: #222;
+  }
+  .road-horizontal { width: 100%; height: 120px; top: 50%; margin-top: -60px; }
+  .road-vertical { width: 120px; height: 100%; left: 50%; margin-left: -60px; }
+
+  /* Zebra crossings */
+  .zebra {
+    position: absolute;
+    background: #fff;
+  }
+  .zebra-horizontal { width: 40px; height: 10px; left: 50%; transform: translateX(-50%); }
+  .zebra-horizontal:nth-child(1) { top: 240px; }
+  .zebra-horizontal:nth-child(2) { top: 270px; }
+  .zebra-horizontal:nth-child(3) { top: 300px; }
+  .zebra-horizontal:nth-child(4) { top: 330px; }
+
+  .zebra-vertical { width: 10px; height: 40px; top: 50%; transform: translateY(-50%); }
+  .zebra-vertical:nth-child(1) { left: 240px; }
+  .zebra-vertical:nth-child(2) { left: 270px; }
+  .zebra-vertical:nth-child(3) { left: 300px; }
+  .zebra-vertical:nth-child(4) { left: 330px; }
+
+  /* Traffic lights */
+  .traffic-light {
+    width: 30px;
+    height: 90px;
+    background: #222;
+    border-radius: 5px;
+    padding: 5px;
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    align-items: center;
+  }
+  .bulb { width: 20px; height: 20px; border-radius: 50%; background: #444; }
+  .active.red { background: red; }
+  .active.yellow { background: yellow; }
+  .active.green { background: lime; }
+
+  #light-north { top: 150px; left: 285px; }
+  #light-south { bottom: 150px; left: 285px; }
+  #light-east { right: 150px; top: 285px; }
+  #light-west { left: 150px; top: 285px; }
+
+  /* Cars */
+  .car {
+    position: absolute;
+    width: 25px;
+    height: 15px;
+    border-radius: 3px;
+  }
+  .car.ns { background: cyan; }
+  .car.ew { background: orange; }
+
+</style>
+</head>
+<body>
+<h1>AI Traffic Intersection Simulation 🚦</h1>
+
+<div id="intersection">
+  <!-- Roads -->
+  <div class="road-horizontal"></div>
+  <div class="road-vertical"></div>
+
+  <!-- Zebra crossings -->
+  <div class="zebra zebra-horizontal"></div>
+  <div class="zebra zebra-horizontal"></div>
+  <div class="zebra zebra-horizontal"></div>
+  <div class="zebra zebra-horizontal"></div>
+  <div class="zebra zebra-vertical"></div>
+  <div class="zebra zebra-vertical"></div>
+  <div class="zebra zebra-vertical"></div>
+  <div class="zebra zebra-vertical"></div>
+
+  <!-- Traffic Lights -->
+  <div id="light-north" class="traffic-light">
+    <div class="bulb red"></div>
+    <div class="bulb yellow"></div>
+    <div class="bulb green"></div>
+  </div>
+  <div id="light-south" class="traffic-light">
+    <div class="bulb red"></div>
+    <div class="bulb yellow"></div>
+    <div class="bulb green"></div>
+  </div>
+  <div id="light-east" class="traffic-light">
+    <div class="bulb red"></div>
+    <div class="bulb yellow"></div>
+    <div class="bulb green"></div>
+  </div>
+  <div id="light-west" class="traffic-light">
+    <div class="bulb red"></div>
+    <div class="bulb yellow"></div>
+    <div class="bulb green"></div>
+  </div>
+</div>
+
+<script>
+  const lights = {
+    north: document.querySelectorAll("#light-north .bulb"),
+    south: document.querySelectorAll("#light-south .bulb"),
+    east: document.querySelectorAll("#light-east .bulb"),
+    west: document.querySelectorAll("#light-west .bulb")
+  };
+
+  const intersection = document.getElementById("intersection");
+  const cars = [];
+
+  // Spawn car at lane
+  function spawnCar(dir, lane) {
+    const car = document.createElement("div");
+    car.classList.add("car", dir === "NS" ? "ns" : "ew");
+    if (dir === "NS") {
+      car.style.left = (285 + lane*30) + "px"; // lane 0 or 1
+      car.style.top = "0px";
+    } else {
+      car.style.top = (285 + lane*20) + "px";
+      car.style.left = "600px";
+    }
+    intersection.appendChild(car);
+    cars.push({el: car, dir, lane, pos: 0});
+  }
+
+  // Move cars depending on light
+  function moveCars(phase) {
+    cars.forEach((c,i)=>{
+      if(c.dir === "NS") {
+        if(phase === "NS") c.pos += 2;
+        // Stop at zebra if red
+        if(c.pos >= 240 && phase !== "NS") return;
+        c.el.style.top = c.pos + "px";
+        if(c.pos > 600) { c.el.remove(); cars.splice(i,1); }
+      } else {
+        if(phase === "EW") c.pos += 2;
+        if(c.pos >= 240 && phase !== "EW") return;
+        c.el.style.left = 600 - c.pos + "px";
+        if(600 - c.pos < -30) { c.el.remove(); cars.splice(i,1); }
+      }
+    });
+  }
+
+  function setLights(phase) {
+    ["north","south","east","west"].forEach(d=>{
+      lights[d].forEach(b=>b.classList.remove("active","red","yellow","green"));
+    });
+    if(phase==="NS") {
+      lights.north[2].classList.add("active","green");
+      lights.south[2].classList.add("active","green");
+      lights.east[0].classList.add("active","red");
+      lights.west[0].classList.add("active","red");
+    } else {
+      lights.east[2].classList.add("active","green");
+      lights.west[2].classList.add("active","green");
+      lights.north[0].classList.add("active","red");
+      lights.south[0].classList.add("active","red");
+    }
+  }
+
+  // Simulation loop
+  let phase = "NS";
+  let timer = 15; // initial green for NS
+  setLights(phase);
+
+  setInterval(()=>{
+    timer--;
+    if(timer<=0){
+      if(phase==="NS") { phase="EW"; timer=15; } 
+      else { phase="NS"; timer=15; } // green phase always 15s
+      setLights(phase);
+      // spawn cars in both lanes of active direction
+      spawnCar(phase,0);
+      spawnCar(phase,1);
+    }
+    moveCars(phase);
+  },1000); // 1 second per tick
+</script>
+</body>
+</html>
