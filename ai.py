@@ -1,9 +1,7 @@
 import random
-import heapq
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import networkx as nx
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import LabelEncoder
 
@@ -52,31 +50,40 @@ def train_signal_model():
 
 model, le_time, le_weather, training_data = train_signal_model()
 
+# -----------------------------
+# 2. AI PREDICTION WITH GUARDRAILS
+# -----------------------------
 def predict_green_time(time_of_day, vehicles, foot_traffic, weather, event, emergency):
+    # Encode inputs
     time_enc = le_time.transform([time_of_day])[0]
     weather_enc = le_weather.transform([weather])[0]
     features = [[time_enc, vehicles, foot_traffic, weather_enc, event, emergency]]
     prediction = model.predict(features)[0]
-    return max(5, round(prediction, 2))
 
-# -----------------------------
-# 2. DIJKSTRA FOR ROUTE
-# -----------------------------
-def dijkstra(graph, start, end):
-    queue = [(0, start, [])]
-    seen = set()
-    while queue:
-        cost, node, path = heapq.heappop(queue)
-        if node in seen:
-            continue
-        path = path + [node]
-        seen.add(node)
-        if node == end:
-            return cost, path
-        for next_node, weight in graph.get(node, {}).items():
-            if next_node not in seen:
-                heapq.heappush(queue, (cost + weight, next_node, path))
-    return float("inf"), []
+    # -----------------------------
+    # Guardrails: common-sense rules
+    # -----------------------------
+    # 1. Absolute minimum and maximum bounds
+    green_time = max(3.0, round(prediction, 2))   # at least 3 sec
+    green_time = min(green_time, 120.0)           # cap at 2 minutes
+
+    # 2. Handle very low traffic
+    if vehicles <= 1 and emergency == 0:
+        green_time = 5.0   # fixed short cycle
+
+    # 3. Handle very high traffic
+    if vehicles > 80:
+        green_time = max(green_time, 90.0)   # guarantee longer light
+
+    # 4. Emergency vehicle priority
+    if emergency == 1:
+        green_time = max(green_time, 60.0)   # ensure long green window
+
+    # 5. Pedestrian safety: if high foot traffic, enforce minimum
+    if foot_traffic > 20:
+        green_time = max(green_time, 30.0)
+
+    return round(green_time, 2)
 
 # -----------------------------
 # 3. VISUALIZATION FUNCTIONS
@@ -97,19 +104,6 @@ def plot_signal_predictions(predictions):
     plt.title("Traffic Signal Predictions")
     plt.show()
 
-def plot_city_graph(graph, path=None):
-    G = nx.Graph()
-    for node, edges in graph.items():
-        for dest, weight in edges.items():
-            G.add_edge(node, dest, weight=weight)
-    pos = nx.spring_layout(G)
-    nx.draw(G, pos, with_labels=True, node_color='skyblue', node_size=1000)
-    nx.draw_networkx_edge_labels(G, pos, edge_labels=nx.get_edge_attributes(G,'weight'))
-    if path:
-        nx.draw_networkx_nodes(G, pos, nodelist=path, node_color='orange', node_size=1200)
-        nx.draw_networkx_edges(G, pos, edgelist=list(zip(path, path[1:])), edge_color='orange', width=3)
-    plt.show()
-
 # -----------------------------
 # 4. INTERACTIVE DEMO
 # -----------------------------
@@ -124,10 +118,11 @@ if __name__ == "__main__":
         "Signal A": {"time": "morning", "vehicles": 30, "foot": 10, "weather": "sunny", "event": 0, "emergency": 0},
         "Signal B": {"time": "evening", "vehicles": 50, "foot": 20, "weather": "rainy", "event": 1, "emergency": 0},
         "Signal C": {"time": "night", "vehicles": 15, "foot": 2, "weather": "sunny", "event": 0, "emergency": 1},
+        "Signal D": {"time": "afternoon", "vehicles": 1, "foot": 0, "weather": "sunny", "event": 0, "emergency": 0},
     }
     
     predictions = {}
-    print("\n🔵 Predicted Signal Timings:")
+    print("\n🔵 Predicted Signal Timings (with Guardrails):")
     for signal, factors in traffic_signals.items():
         duration = predict_green_time(
             factors["time"], factors["vehicles"], factors["foot"],
@@ -137,10 +132,3 @@ if __name__ == "__main__":
         print(f"{signal} → {duration} seconds")
     
     plot_signal_predictions(predictions)
-    
-    # Suggest path
-    city_graph = {"A": {"B": 5, "C": 10}, "B": {"A": 5, "D": 2}, "C": {"A": 10, "D": 1}, "D": {"B": 2, "C": 1}}
-    cost, path = dijkstra(city_graph, "A", "D")
-    print("\n🟢 Suggested Path:")
-    print(f"Best route from A → D: {path} (congestion score {cost})")
-    plot_city_graph(city_graph, path)
