@@ -3,17 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Traffic Light System</title>
+  <title>Route X</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
   <div class="dashboard">
     <header>
       <h1>Real-Time AI Traffic Control</h1>
       <p>Monitoring Live Traffic Flow</p>
     </header>
 
-    <section class="traffic-container">
+    <div class="traffic-container">
       <!-- North / South Light -->
       <div class="traffic-section">
         <h2>North / South</h2>
@@ -38,10 +39,10 @@
         <div class="stats">
           <h3>Traffic Density</h3>
           <ul>
-            <li>North: <span>High</span></li>
-            <li>South: <span>Medium</span></li>
-            <li>East: <span>Low</span></li>
-            <li>West: <span>High</span></li>
+            <li>North: <span id="north-density">High</span></li>
+            <li>South: <span id="south-density">Medium</span></li>
+            <li>East: <span id="east-density">Low</span></li>
+            <li>West: <span id="west-density">High</span></li>
           </ul>
         </div>
       </div>
@@ -56,52 +57,14 @@
         </div>
         <p>Demand: <span id="ew-demand">8</span></p>
       </div>
-    </section>
+    </div>
+
+    <!-- The Simulation Canvas -->
+    <canvas id="simulationCanvas"></canvas>
+    
+    <!-- Manually trigger a prediction -->
+    <div class="controls">
+      <button id="predictButton" class="button">Get AI Prediction</button>
+    </div>
+    <script src="simulation.js" ></script>
   </div>
-
-  <script>
-    const nsLights = document.querySelectorAll("#ns-light .light");
-    const ewLights = document.querySelectorAll("#ew-light .light");
-    const statusText = document.getElementById("status");
-    const timerDisplay = document.getElementById("timer");
-
-    const phases = [
-      { ns: "green", ew: "red", text: "North/South Green - Go", time: 10 },
-      { ns: "yellow", ew: "red", text: "North/South Yellow - Ready", time: 3 },
-      { ns: "red", ew: "green", text: "East/West Green - Go", time: 10 },
-      { ns: "red", ew: "yellow", text: "East/West Yellow - Ready", time: 3 }
-    ];
-
-    let currentPhase = 0;
-    let timeLeft = phases[currentPhase].time;
-
-    function updateLights() {
-      // Reset all lights
-      nsLights.forEach(light => light.classList.remove("active"));
-      ewLights.forEach(light => light.classList.remove("active"));
-
-      // Activate based on phase
-      nsLights.forEach(light => {
-        if (light.classList.contains(phases[currentPhase].ns)) light.classList.add("active");
-      });
-      ewLights.forEach(light => {
-        if (light.classList.contains(phases[currentPhase].ew)) light.classList.add("active");
-      });
-
-      statusText.innerText = phases[currentPhase].text;
-      timeLeft = phases[currentPhase].time;
-    }
-
-    setInterval(() => {
-      timeLeft--;
-      timerDisplay.innerText = timeLeft;
-      if (timeLeft <= 0) {
-        currentPhase = (currentPhase + 1) % phases.length;
-        updateLights();
-      }
-    }, 1000);
-
-    updateLights();
-  </script>
-</body>
-</html>
