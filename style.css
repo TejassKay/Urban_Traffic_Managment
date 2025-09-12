@@ -1,90 +1,102 @@
+/* Dark Theme Dashboard */
 body {
-    font-family: 'Inter', sans-serif;
-    background-color: #f0f2f5;
-    margin: 0;
-    padding: 20px;
-    color: #333;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  background-color: #0d1117;
+  color: #e6edf3;
 }
 
-.container {
-    width: 100%;
-    max-width: 1200px;
-    background: #fff;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+.dashboard {
+  text-align: center;
+  padding: 20px;
 }
 
-h1, h2 {
-    text-align: center;
-    color: #1a73e8;
+header h1 {
+  font-size: 2rem;
+  margin: 0;
+  color: #58a6ff;
 }
 
-.main-content {
-    display: flex;
-    gap: 20px;
-    margin-top: 20px;
+header p {
+  font-size: 1rem;
+  color: #8b949e;
+  margin-bottom: 20px;
 }
 
-.simulation-container {
-    flex-grow: 1;
+.traffic-container {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin-top: 30px;
+  gap: 40px;
 }
 
-canvas {
-    background: #e0e0e0;
-    border: 1px solid #ccc;
-    display: block;
-    width: 100%;
-    border-radius: 8px;
+.traffic-section {
+  text-align: center;
+  background: #161b22;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
 }
 
-.controls-and-data {
-    width: 300px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+.traffic-light {
+  width: 80px;
+  height: 200px;
+  background: black;
+  border-radius: 20px;
+  margin: 15px auto;
+  padding: 15px 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
 }
 
-.controls, .data-dashboard {
-    background: #f9f9f9;
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+.light {
+  width: 50px;
+  height: 50px;
+  margin: auto;
+  border-radius: 50%;
+  background: #333;
+  opacity: 0.3;
 }
 
-.controls button {
-    display: block;
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 10px;
-    border: none;
-    border-radius: 5px;
-    background-color: #1a73e8;
-    color: white;
-    font-size: 16px;
-    cursor: pointer;
-    transition: background-color 0.3s;
+.light.red.active { background: red; opacity: 1; }
+.light.yellow.active { background: yellow; opacity: 1; }
+.light.green.active { background: limegreen; opacity: 1; }
+
+.traffic-info {
+  background: #161b22;
+  padding: 25px;
+  border-radius: 12px;
+  min-width: 250px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
 }
 
-.controls button:hover {
-    background-color: #155ab6;
+.countdown h3 {
+  margin: 10px 0 5px;
+  color: #58a6ff;
 }
 
-.data-dashboard .data-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid #eee;
+#timer {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #00ff85;
 }
 
-.data-dashboard .data-item:last-child {
-    border-bottom: none;
+.stats {
+  margin-top: 20px;
 }
 
-.label {
-    font-weight: bold;
+.stats h3 {
+  margin-bottom: 10px;
+  color: #58a6ff;
+}
+
+.stats ul {
+  list-style: none;
+  padding: 0;
+}
+
+.stats li {
+  margin: 5px 0;
 }
