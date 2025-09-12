@@ -87,14 +87,44 @@
 
   .car {
     position: absolute;
-    width: 25px;
-    height: 15px;
-    border-radius: 3px;
+    width: 40px; /* Increased width for a more realistic look */
+    height: 20px; /* Increased height */
+    border-radius: 5px; /* Slightly rounded corners */
+    box-sizing: border-box;
+    border: 1px solid #000; /* Outline for better definition */
+    background-color: #3498db; /* Default car color */
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
   }
-  .car.ns { background: cyan; }
-  .car.ew { background: orange; }
-  .car.sn { background: yellow; } /* New class for South-North cars */
-  .car.we { background: magenta; } /* New class for West-East cars */
+
+  .car::before, .car::after {
+      content: '';
+      position: absolute;
+      width: 8px; /* Window width */
+      height: 10px; /* Window height */
+      background-color: #aed6f1; /* Window color */
+      border-radius: 2px;
+  }
+
+  .car::before {
+      left: 5px; /* Position of the front window */
+  }
+
+  .car::after {
+      right: 5px; /* Position of the back window */
+  }
+
+  .car.ns {
+      background-color: #e74c3c; /* Red car for NS */
+      transform: rotate(90deg); /* Rotate for vertical movement */
+  }
+  .car.ew { background-color: #2ecc71; } /* Green car for EW */
+  .car.sn {
+      background-color: #f1c40f; /* Yellow car for SN */
+      transform: rotate(-90deg); /* Rotate for vertical movement in opposite direction */
+  }
+  .car.we { background-color: #9b59b6; } /* Purple car for WE */
 
 
 </style>
@@ -172,22 +202,22 @@ function spawnCar(dir, lane) {
 
   let initialPos;
   if (dir === "NS") {
-    car.style.left = "295px"; // Specific lane for NS
-    car.style.top = "-30px";
-    initialPos = -30;
+    car.style.left = "290px"; // Adjusted for new car size and lane
+    car.style.top = "-50px"; // Adjusted for new car size
+    initialPos = -50;
   } else if (dir === "SN") {
-    car.style.left = "320px"; // Specific lane for SN (right of NS)
-    car.style.top = "630px"; // spawn below screen
-    initialPos = 630;
+    car.style.left = "330px"; // Adjusted for new car size and lane
+    car.style.top = "650px"; // spawn below screen
+    initialPos = 650;
   }
   else if (dir === "EW") {
-    car.style.top = "295px"; // Specific lane for EW
-    car.style.left = "630px";
-    initialPos = 630;
+    car.style.top = "290px"; // Adjusted for new car size and lane
+    car.style.left = "650px"; // Adjusted for new car size
+    initialPos = 650;
   } else if (dir === "WE") {
-     car.style.top = "320px"; // Specific lane for WE (below EW)
-     car.style.left = "-30px"; // spawn left side
-     initialPos = -30;
+     car.style.top = "330px"; // Adjusted for new car size and lane
+     car.style.left = "-50px"; // spawn left side
+     initialPos = -50;
   }
 
 
@@ -208,8 +238,8 @@ function moveCars() {
 
     let canMove = true;
     if (frontCar) {
-      if ((c.dir === "NS" || c.dir === "WE") && frontCar.pos - c.pos < 40) canMove = false; // safe gap
-      if ((c.dir === "SN" || c.dir === "EW") && c.pos - frontCar.pos < 40) canMove = false;
+      if ((c.dir === "NS" || c.dir === "WE") && frontCar.pos - c.pos < 50) canMove = false; // Adjusted safe gap for larger cars
+      if ((c.dir === "SN" || c.dir === "EW") && c.pos - frontCar.pos < 50) canMove = false; // Adjusted safe gap
     }
 
     // Define stop lines based on direction
@@ -260,7 +290,7 @@ function moveCars() {
     }
 
     // Remove cars when they are off-screen
-    if ((c.dir === "NS" && c.pos > 630) || (c.dir === "SN" && c.pos < -30) || (c.dir === "EW" && c.pos < -30) || (c.dir === "WE" && c.pos > 630)) {
+    if ((c.dir === "NS" && c.pos > 650) || (c.dir === "SN" && c.pos < -50) || (c.dir === "EW" && c.pos < -50) || (c.dir === "WE" && c.pos > 650)) {
         c.el.remove();
         cars.splice(i, 1);
     }
