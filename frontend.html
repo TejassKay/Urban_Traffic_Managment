@@ -1,3 +1,4 @@
+%%html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,10 +13,8 @@
     margin: 0;
     padding: 0;
   }
-
   h1 { color: #00ffcc; margin: 20px; }
 
-  /* Intersection container */
   #intersection {
     position: relative;
     width: 600px;
@@ -25,7 +24,6 @@
     border: 4px solid #555;
   }
 
-  /* Roads */
   .road-horizontal, .road-vertical {
     position: absolute;
     background: #222;
@@ -33,27 +31,38 @@
   .road-horizontal { width: 100%; height: 120px; top: 50%; margin-top: -60px; }
   .road-vertical { width: 120px; height: 100%; left: 50%; margin-left: -60px; }
 
-  /* Zebra crossings */
-  .zebra {
+  /* Removed zebra styles */
+
+  .stop-line {
     position: absolute;
     background: #fff;
   }
-  .zebra-horizontal { width: 40px; height: 10px; left: 50%; transform: translateX(-50%); }
-  .zebra-horizontal:nth-child(1) { top: 240px; }
-  .zebra-horizontal:nth-child(2) { top: 270px; }
-  .zebra-horizontal:nth-child(3) { top: 300px; }
-  .zebra-horizontal:nth-child(4) { top: 330px; }
 
-  .zebra-vertical { width: 10px; height: 40px; top: 50%; transform: translateY(-50%); }
-  .zebra-vertical:nth-child(1) { left: 240px; }
-  .zebra-vertical:nth-child(2) { left: 270px; }
-  .zebra-vertical:nth-child(3) { left: 300px; }
-  .zebra-vertical:nth-child(4) { left: 330px; }
+  .stop-line-horizontal {
+      width: 120px; /* Width of the road */
+      height: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+  }
 
-  /* Traffic lights */
+  .stop-line-horizontal.north { top: 235px; } /* Position before the intersection */
+  .stop-line-horizontal.south { bottom: 235px; } /* Position before the intersection */
+
+
+  .stop-line-vertical {
+      width: 5px;
+      height: 120px; /* Height of the road */
+      top: 50%;
+      transform: translateY(-50%);
+  }
+
+  .stop-line-vertical.east { right: 235px; } /* Position before the intersection */
+  .stop-line-vertical.west { left: 235px; } /* Position before the intersection */
+
+
   .traffic-light {
-    width: 30px;
-    height: 90px;
+    width: 40px;
+    height: 110px;
     background: #222;
     border-radius: 5px;
     padding: 5px;
@@ -62,18 +71,20 @@
     flex-direction: column;
     justify-content: space-around;
     align-items: center;
+    font-size: 14px;
+    color: #fff;
   }
   .bulb { width: 20px; height: 20px; border-radius: 50%; background: #444; }
   .active.red { background: red; }
   .active.yellow { background: yellow; }
   .active.green { background: lime; }
+  .timer { font-size: 12px; margin-top: 5px; }
 
   #light-north { top: 150px; left: 285px; }
   #light-south { bottom: 150px; left: 285px; }
   #light-east { right: 150px; top: 285px; }
   #light-west { left: 150px; top: 285px; }
 
-  /* Cars */
   .car {
     position: absolute;
     width: 25px;
@@ -82,128 +93,231 @@
   }
   .car.ns { background: cyan; }
   .car.ew { background: orange; }
+  .car.sn { background: yellow; } /* New class for South-North cars */
+  .car.we { background: magenta; } /* New class for West-East cars */
+
 
 </style>
 </head>
 <body>
-<h1>AI Traffic Intersection Simulation 🚦</h1>
+<h1>AI Traffic Simulation 🚦</h1>
 
 <div id="intersection">
-  <!-- Roads -->
   <div class="road-horizontal"></div>
   <div class="road-vertical"></div>
 
-  <!-- Zebra crossings -->
-  <div class="zebra zebra-horizontal"></div>
-  <div class="zebra zebra-horizontal"></div>
-  <div class="zebra zebra-horizontal"></div>
-  <div class="zebra zebra-horizontal"></div>
-  <div class="zebra zebra-vertical"></div>
-  <div class="zebra zebra-vertical"></div>
-  <div class="zebra zebra-vertical"></div>
-  <div class="zebra zebra-vertical"></div>
+  <!-- Stop Lines -->
+  <div class="stop-line stop-line-horizontal north"></div>
+  <div class="stop-line stop-line-horizontal south"></div>
+  <div class="stop-line stop-line-vertical east"></div>
+  <div class="stop-line stop-line-vertical west"></div>
+
 
   <!-- Traffic Lights -->
   <div id="light-north" class="traffic-light">
     <div class="bulb red"></div>
     <div class="bulb yellow"></div>
     <div class="bulb green"></div>
+    <div class="timer">15</div>
   </div>
   <div id="light-south" class="traffic-light">
     <div class="bulb red"></div>
     <div class="bulb yellow"></div>
     <div class="bulb green"></div>
+    <div class="timer">15</div>
   </div>
   <div id="light-east" class="traffic-light">
     <div class="bulb red"></div>
     <div class="bulb yellow"></div>
     <div class="bulb green"></div>
+    <div class="timer">15</div>
   </div>
   <div id="light-west" class="traffic-light">
     <div class="bulb red"></div>
     <div class="bulb yellow"></div>
     <div class="bulb green"></div>
+    <div class="timer">15</div>
   </div>
 </div>
 
 <script>
-  const lights = {
-    north: document.querySelectorAll("#light-north .bulb"),
-    south: document.querySelectorAll("#light-south .bulb"),
-    east: document.querySelectorAll("#light-east .bulb"),
-    west: document.querySelectorAll("#light-west .bulb")
-  };
+const lights = {
+  north: document.querySelectorAll("#light-north .bulb"),
+  south: document.querySelectorAll("#light-south .bulb"),
+  east: document.querySelectorAll("#light-east .bulb"),
+  west: document.querySelectorAll("#light-west .bulb")
+};
+const timers = {
+  north: document.querySelector("#light-north .timer"),
+  south: document.querySelector("#light-south .timer"),
+  east: document.querySelector("#light-east .timer"),
+  west: document.querySelector("#light-west .timer")
+};
 
-  const intersection = document.getElementById("intersection");
-  const cars = [];
+const intersection = document.getElementById("intersection");
+const cars = [];
+let phase = "NS";
+let timer = 15;
+let speed = 3; // px per frame
 
-  // Spawn car at lane
-  function spawnCar(dir, lane) {
-    const car = document.createElement("div");
-    car.classList.add("car", dir === "NS" ? "ns" : "ew");
-    if (dir === "NS") {
-      car.style.left = (285 + lane*30) + "px"; // lane 0 or 1
-      car.style.top = "0px";
-    } else {
-      car.style.top = (285 + lane*20) + "px";
-      car.style.left = "600px";
-    }
-    intersection.appendChild(car);
-    cars.push({el: car, dir, lane, pos: 0});
+function spawnCar(dir, lane) {
+  // Check if a car already exists for this direction
+  const carExistsInDirection = cars.some(car => car.dir === dir);
+  if (carExistsInDirection) {
+    return; // Don't spawn a new car if one already exists for this direction
   }
 
-  // Move cars depending on light
-  function moveCars(phase) {
-    cars.forEach((c,i)=>{
-      if(c.dir === "NS") {
-        if(phase === "NS") c.pos += 2;
-        // Stop at zebra if red
-        if(c.pos >= 240 && phase !== "NS") return;
-        c.el.style.top = c.pos + "px";
-        if(c.pos > 600) { c.el.remove(); cars.splice(i,1); }
-      } else {
-        if(phase === "EW") c.pos += 2;
-        if(c.pos >= 240 && phase !== "EW") return;
-        c.el.style.left = 600 - c.pos + "px";
-        if(600 - c.pos < -30) { c.el.remove(); cars.splice(i,1); }
-      }
-    });
+  const car = document.createElement("div");
+  car.classList.add("car", dir.toLowerCase()); // Use lowercase for class names
+
+  let initialPos;
+  if (dir === "NS") {
+    car.style.left = "295px"; // Specific lane for NS
+    car.style.top = "-30px";
+    initialPos = -30;
+  } else if (dir === "SN") {
+    car.style.left = "320px"; // Specific lane for SN (right of NS)
+    car.style.top = "630px"; // spawn below screen
+    initialPos = 630;
+  }
+  else if (dir === "EW") {
+    car.style.top = "295px"; // Specific lane for EW
+    car.style.left = "630px";
+    initialPos = 630;
+  } else if (dir === "WE") {
+     car.style.top = "320px"; // Specific lane for WE (below EW)
+     car.style.left = "-30px"; // spawn left side
+     initialPos = -30;
   }
 
-  function setLights(phase) {
-    ["north","south","east","west"].forEach(d=>{
-      lights[d].forEach(b=>b.classList.remove("active","red","yellow","green"));
-    });
-    if(phase==="NS") {
-      lights.north[2].classList.add("active","green");
-      lights.south[2].classList.add("active","green");
-      lights.east[0].classList.add("active","red");
-      lights.west[0].classList.add("active","red");
-    } else {
-      lights.east[2].classList.add("active","green");
-      lights.west[2].classList.add("active","green");
-      lights.north[0].classList.add("active","red");
-      lights.south[0].classList.add("active","red");
+
+  intersection.appendChild(car);
+  cars.push({ el: car, dir, lane, pos: initialPos });
+}
+
+function moveCars() {
+  cars.forEach((c, i) => {
+    // find the car ahead in same lane + dir
+    const frontCar = cars
+      .filter(other => other.dir === c.dir && other.lane === c.lane && other !== c)
+      .sort((a, b) => {
+        if (c.dir === "NS" || c.dir === "WE") return a.pos - b.pos;
+        else return b.pos - a.pos;
+      })
+      .find(fc => (c.dir === "NS" || c.dir === "WE" ? fc.pos > c.pos : fc.pos < c.pos));
+
+    let canMove = true;
+    if (frontCar) {
+      if ((c.dir === "NS" || c.dir === "WE") && frontCar.pos - c.pos < 40) canMove = false; // safe gap
+      if ((c.dir === "SN" || c.dir === "EW") && c.pos - frontCar.pos < 40) canMove = false;
     }
+
+    // Define stop lines based on direction
+    let stopLine;
+    let currentPhase;
+    if (c.dir === "NS") {
+        stopLine = 240; // Position of the northern stop line
+        currentPhase = "NS";
+    } else if (c.dir === "SN") {
+        stopLine = 340; // Position of the southern stop line
+        currentPhase = "NS";
+    } else if (c.dir === "EW") {
+        stopLine = 340; // Position of the eastern stop line
+        currentPhase = "EW";
+    } else if (c.dir === "WE") {
+        stopLine = 240; // Position of the western stop line
+        currentPhase = "EW";
+    }
+
+    // Check if the car is approaching or at the stop line and the light is red
+    if (phase !== currentPhase) {
+        if (c.dir === "NS" && c.pos + c.el.offsetHeight >= stopLine) {
+            canMove = false;
+        } else if (c.dir === "SN" && c.pos <= stopLine) {
+            canMove = false;
+        } else if (c.dir === "EW" && c.pos <= stopLine) {
+            canMove = false;
+        } else if (c.dir === "WE" && c.pos + c.el.offsetWidth >= stopLine) { // Use offsetWidth for horizontal movement
+            canMove = false;
+        }
+    }
+
+
+    if (canMove) {
+        if (c.dir === "NS") {
+            c.pos += speed;
+            c.el.style.top = c.pos + "px";
+        } else if (c.dir === "SN") {
+            c.pos -= speed;
+            c.el.style.top = c.pos + "px";
+        } else if (c.dir === "EW") {
+            c.pos -= speed;
+            c.el.style.left = c.pos + "px";
+        } else if (c.dir === "WE") {
+            c.pos += speed;
+            c.el.style.left = c.pos + "px";
+        }
+    }
+
+    // Remove cars when they are off-screen
+    if ((c.dir === "NS" && c.pos > 630) || (c.dir === "SN" && c.pos < -30) || (c.dir === "EW" && c.pos < -30) || (c.dir === "WE" && c.pos > 630)) {
+        c.el.remove();
+        cars.splice(i, 1);
+    }
+  });
+}
+
+
+function setLights(phase) {
+  ["north","south","east","west"].forEach(d=>{
+    lights[d].forEach(b=>b.classList.remove("active","red","yellow","green"));
+  });
+  if(phase==="NS") {
+    lights.north[2].classList.add("active","green");
+    lights.south[2].classList.add("active","green");
+    lights.east[0].classList.add("active","red");
+    lights.west[0].classList.add("active","red");
+  } else {
+    lights.east[2].classList.add("active","green");
+    lights.west[2].classList.add("active","green");
+    lights.north[0].classList.add("active","red");
+    lights.south[0].classList.add("active","red");
   }
+}
 
-  // Simulation loop
-  let phase = "NS";
-  let timer = 15; // initial green for NS
-  setLights(phase);
+function updateTimers() {
+  ["north","south","east","west"].forEach(d=>{
+    timers[d].textContent = timer;
+  });
+}
 
-  setInterval(()=>{
-    timer--;
-    if(timer<=0){
-      if(phase==="NS") { phase="EW"; timer=15; } 
-      else { phase="NS"; timer=15; } // green phase always 15s
-      setLights(phase);
-      // spawn cars in both lanes of active direction
-      spawnCar(phase,0);
-      spawnCar(phase,1);
-    }
-    moveCars(phase);
-  },1000); // 1 second per tick
+function loop() {
+  timer--;
+  if(timer<=0){
+    phase = (phase==="NS") ? "EW" : "NS";
+    timer=15;
+    setLights(phase);
+  }
+  updateTimers();
+}
+
+// 🚗 Random car spawner (every 1–3s)
+setInterval(()=>{
+  const dirs = ["NS","SN","EW","WE"]; // Added new directions
+  const dir = dirs[Math.floor(Math.random()*dirs.length)]; // Select randomly from all directions
+  const lane = Math.floor(Math.random()*2);
+  spawnCar(dir, lane);
+}, 1000); // Increased spawn rate slightly
+
+setLights(phase);
+setInterval(loop,1000);
+
+function animate() {
+  moveCars();
+  requestAnimationFrame(animate);
+}
+animate();
 </script>
+
 </body>
 </html>
