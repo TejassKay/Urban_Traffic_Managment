@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import LabelEncoder
+from flask import Flask, jsonify, request
+from flask_cors import CORS
 
 # -----------------------------
 # 1. TRAIN AI MODEL FOR SIGNAL TIMINGS
@@ -50,39 +52,21 @@ def train_signal_model():
 
 model, le_time, le_weather, training_data = train_signal_model()
 
-# -----------------------------
-# 2. AI PREDICTION WITH GUARDRAILS
-# -----------------------------
 def predict_green_time(time_of_day, vehicles, foot_traffic, weather, event, emergency):
-    # Encode inputs
     time_enc = le_time.transform([time_of_day])[0]
     weather_enc = le_weather.transform([weather])[0]
     features = [[time_enc, vehicles, foot_traffic, weather_enc, event, emergency]]
     prediction = model.predict(features)[0]
-
-    # -----------------------------
-    # Guardrails: common-sense rules
-    # -----------------------------
-    # 1. Absolute minimum and maximum bounds
-    green_time = max(3.0, round(prediction, 2))   # at least 3 sec
-    green_time = min(green_time, 120.0)           # cap at 2 minutes
-
-    # 2. Handle very low traffic
+    green_time = max(3.0, round(prediction, 2))
+    green_time = min(green_time, 120.0)
     if vehicles <= 1 and emergency == 0:
-        green_time = 5.0   # fixed short cycle
-
-    # 3. Handle very high traffic
+        green_time = 5.0
     if vehicles > 80:
-        green_time = max(green_time, 90.0)   # guarantee longer light
-
-    # 4. Emergency vehicle priority
+        green_time = max(green_time, 90.0)
     if emergency == 1:
-        green_time = max(green_time, 60.0)   # ensure long green window
-
-    # 5. Pedestrian safety: if high foot traffic, enforce minimum
+        green_time = max(green_time, 60.0)
     if foot_traffic > 20:
         green_time = max(green_time, 30.0)
-
     return round(green_time, 2)
 
 # -----------------------------
@@ -105,30 +89,29 @@ def plot_signal_predictions(predictions):
     plt.show()
 
 # -----------------------------
-# 4. INTERACTIVE DEMO
+# 4. FLASK API
 # -----------------------------
-if __name__ == "__main__":
-    # Show training data
-    print("\n📊 Training Data Sample:")
-    print(training_data.head())
-    plot_training_data(training_data)
-    
-    # Predict signals interactively
-    traffic_signals = {
-        "Signal A": {"time": "morning", "vehicles": 30, "foot": 10, "weather": "sunny", "event": 0, "emergency": 0},
-        "Signal B": {"time": "evening", "vehicles": 50, "foot": 20, "weather": "rainy", "event": 1, "emergency": 0},
-        "Signal C": {"time": "night", "vehicles": 15, "foot": 2, "weather": "sunny", "event": 0, "emergency": 1},
-        "Signal D": {"time": "afternoon", "vehicles": 1, "foot": 0, "weather": "sunny", "event": 0, "emergency": 0},
-    }
-    
-    predictions = {}
-    print("\n🔵 Predicted Signal Timings (with Guardrails):")
-    for signal, factors in traffic_signals.items():
-        duration = predict_green_time(
-            factors["time"], factors["vehicles"], factors["foot"],
-            factors["weather"], factors["event"], factors["emergency"]
-        )
-        predictions[signal] = duration
-        print(f"{signal} → {duration} seconds")
-    
-    plot_signal_predictions(predictions)
+app = Flask(__name__)
+CORS(app)
+
+@app.route('/predict_time', methods=['POST'])
+def predict_time():
+    data = request.json
+    time_of_day = data.get('time_of_day', 'morning')
+    vehicles = data.get('vehicles', 0)
+    foot_traffic = data.get('foot_traffic', 10)
+    weather = data.get('weather', 'sunny')
+    event = data.get('event', 0)
+    emergency = data.get('emergency', 0)
+    predicted_time = predict_green_time(
+        time_of_day,
+        vehicles,
+        foot_traffic,
+        weather,
+        event,
+        emergency
+    )
+    return jsonify({'green_time': predicted_time})
+
+if __name__ == '__main__':
+    app.run(debug=True)
