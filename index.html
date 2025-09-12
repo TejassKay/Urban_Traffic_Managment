@@ -1,43 +1,107 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Traffic Management</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Traffic Light System</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Smart Traffic Management</h1>
-        <div class="main-content">
-            <div class="simulation-container">
-                <canvas id="trafficCanvas"></canvas>
-            </div>
-            <div class="controls-and-data">
-                <div class="controls">
-                    <h2>Controls</h2>
-                    <button id="startStopBtn">Start/Stop</button>
-                    <button id="addCarBtn">Add Car</button>
-                    <button id="resetBtn">Reset</button>
-                </div>
-                <div class="data-dashboard">
-                    <h2>Real-time Data</h2>
-                    <div class="data-item">
-                        <span class="label">Total Vehicles:</span>
-                        <span id="vehicleCount">0</span>
-                    </div>
-                    <div class="data-item">
-                        <span class="label">Average Speed:</span>
-                        <span id="avgSpeed">0 km/h</span>
-                    </div>
-                    <div class="data-item">
-                        <span class="label">Average Wait Time:</span>
-                        <span id="avgWaitTime">0s</span>
-                    </div>
-                </div>
-            </div>
+  <div class="dashboard">
+    <header>
+      <h1>Real-Time AI Traffic Control</h1>
+      <p>Monitoring Live Traffic Flow</p>
+    </header>
+
+    <section class="traffic-container">
+      <!-- North / South Light -->
+      <div class="traffic-section">
+        <h2>North / South</h2>
+        <div class="traffic-light" id="ns-light">
+          <div class="light red"></div>
+          <div class="light yellow"></div>
+          <div class="light green"></div>
         </div>
-    </div>
-    <script src="simulation.js"></script>
+        <p>Demand: <span id="ns-demand">12</span></p>
+      </div>
+
+      <!-- Control Panel -->
+      <div class="traffic-info">
+        <h2>Current Phase</h2>
+        <p id="status">Red Light - Stop</p>
+
+        <div class="countdown">
+          <h3>Time Remaining</h3>
+          <span id="timer">10</span> s
+        </div>
+
+        <div class="stats">
+          <h3>Traffic Density</h3>
+          <ul>
+            <li>North: <span>High</span></li>
+            <li>South: <span>Medium</span></li>
+            <li>East: <span>Low</span></li>
+            <li>West: <span>High</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- East / West Light -->
+      <div class="traffic-section">
+        <h2>East / West</h2>
+        <div class="traffic-light" id="ew-light">
+          <div class="light red"></div>
+          <div class="light yellow"></div>
+          <div class="light green"></div>
+        </div>
+        <p>Demand: <span id="ew-demand">8</span></p>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const nsLights = document.querySelectorAll("#ns-light .light");
+    const ewLights = document.querySelectorAll("#ew-light .light");
+    const statusText = document.getElementById("status");
+    const timerDisplay = document.getElementById("timer");
+
+    const phases = [
+      { ns: "green", ew: "red", text: "North/South Green - Go", time: 10 },
+      { ns: "yellow", ew: "red", text: "North/South Yellow - Ready", time: 3 },
+      { ns: "red", ew: "green", text: "East/West Green - Go", time: 10 },
+      { ns: "red", ew: "yellow", text: "East/West Yellow - Ready", time: 3 }
+    ];
+
+    let currentPhase = 0;
+    let timeLeft = phases[currentPhase].time;
+
+    function updateLights() {
+      // Reset all lights
+      nsLights.forEach(light => light.classList.remove("active"));
+      ewLights.forEach(light => light.classList.remove("active"));
+
+      // Activate based on phase
+      nsLights.forEach(light => {
+        if (light.classList.contains(phases[currentPhase].ns)) light.classList.add("active");
+      });
+      ewLights.forEach(light => {
+        if (light.classList.contains(phases[currentPhase].ew)) light.classList.add("active");
+      });
+
+      statusText.innerText = phases[currentPhase].text;
+      timeLeft = phases[currentPhase].time;
+    }
+
+    setInterval(() => {
+      timeLeft--;
+      timerDisplay.innerText = timeLeft;
+      if (timeLeft <= 0) {
+        currentPhase = (currentPhase + 1) % phases.length;
+        updateLights();
+      }
+    }, 1000);
+
+    updateLights();
+  </script>
 </body>
 </html>
