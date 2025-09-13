@@ -1,117 +1,128 @@
+import numpy as np
 import random
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import LabelEncoder
-from flask import Flask, jsonify, request
-from flask_cors import CORS
 
-# -----------------------------
-# 1. TRAIN AI MODEL FOR SIGNAL TIMINGS
-# -----------------------------
-def generate_training_data(n=1000):
-    data = []
-    for _ in range(n):
-        time_of_day = random.choice(["morning", "afternoon", "evening", "night"])
-        vehicles = random.randint(5, 60)
-        foot_traffic = random.randint(0, 30)
-        weather = random.choice(["sunny", "rainy"])
-        event_nearby = random.choice([0, 1])
-        emergency_vehicle = random.choice([0, 1])
-        green_time = (
-            vehicles * 0.8 +
-            foot_traffic * 0.5 +
-            (10 if weather == "rainy" else 0) +
-            (20 if event_nearby else 0) +
-            (30 if emergency_vehicle else 0)
+# ============================
+# Linear Regression Baseline
+# ============================
+def regression_green_time(model, input_features):
+    """Baseline green time prediction using regression with guardrails"""
+    raw_prediction = model.predict([input_features])[0]
+    green_time = max(3.0, min(raw_prediction, 15.0))  # guardrails
+    return green_time
+
+
+# ============================
+# Reinforcement Learning Agent
+# ============================
+class TrafficLightAgent:
+    def __init__(self, n_states=50, n_actions=7, alpha=0.1, gamma=0.9, epsilon=0.2):
+        """
+        Q-learning traffic light agent
+        - n_states: discretized number of cars
+        - n_actions: possible adjustments to regression prediction
+        - actions: [-3, -2, -1, 0, +1, +2, +3] seconds
+        """
+        self.actions = [-3, -2, -1, 0, 1, 2, 3]
+        self.q_table = np.zeros((n_states, n_actions))
+        self.alpha = alpha
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.n_actions = n_actions
+
+    def choose_action(self, state):
+        # ε-greedy exploration
+        if random.uniform(0, 1) < self.epsilon:
+            return random.randint(0, self.n_actions - 1)
+        return np.argmax(self.q_table[state])
+
+    def update(self, state, action, reward, next_state):
+        # Q-learning update
+        best_next = np.max(self.q_table[next_state])
+        self.q_table[state, action] += self.alpha * (
+            reward + self.gamma * best_next - self.q_table[state, action]
         )
-        green_time += random.randint(-5, 5)
-        data.append([
-            time_of_day, vehicles, foot_traffic, weather,
-            event_nearby, emergency_vehicle, green_time
-        ])
-    df = pd.DataFrame(data, columns=[
-        "time_of_day", "vehicles", "foot_traffic", "weather",
-        "event_nearby", "emergency_vehicle", "green_time"
-    ])
-    return df
 
-def train_signal_model():
-    df = generate_training_data(1000)
-    le_time = LabelEncoder()
-    df["time_encoded"] = le_time.fit_transform(df["time_of_day"])
-    le_weather = LabelEncoder()
-    df["weather_encoded"] = le_weather.fit_transform(df["weather"])
-    X = df[["time_encoded", "vehicles", "foot_traffic",
-            "weather_encoded", "event_nearby", "emergency_vehicle"]]
-    y = df["green_time"]
-    model = LinearRegression()
-    model.fit(X, y)
-    return model, le_time, le_weather, df
 
-model, le_time, le_weather, training_data = train_signal_model()
+# ============================
+# Hybrid Predictor
+# ============================
+def hybrid_green_time(model, agent, input_features):
+    """
+    Hybrid predictor:
+    - If <=1 vehicle -> fixed safe green time
+    - If >1 vehicles -> regression + RL adjustment
+    """
+    total_cars = int(input_features[0])  # assume first feature is car count
 
-def predict_green_time(time_of_day, vehicles, foot_traffic, weather, event, emergency):
-    time_enc = le_time.transform([time_of_day])[0]
-    weather_enc = le_weather.transform([weather])[0]
-    features = [[time_enc, vehicles, foot_traffic, weather_enc, event, emergency]]
-    prediction = model.predict(features)[0]
-    green_time = max(3.0, round(prediction, 2))
-    green_time = min(green_time, 120.0)
-    if vehicles <= 1 and emergency == 0:
-        green_time = 5.0
-    if vehicles > 80:
-        green_time = max(green_time, 90.0)
-    if emergency == 1:
-        green_time = max(green_time, 60.0)
-    if foot_traffic > 20:
-        green_time = max(green_time, 30.0)
-    return round(green_time, 2)
+    # Case 1: very few cars -> fixed green
+    if total_cars <= 1:
+        return 5.0, None, None
 
-# -----------------------------
-# 3. VISUALIZATION FUNCTIONS
-# -----------------------------
-def plot_training_data(df):
-    plt.figure(figsize=(12, 5))
-    sns.scatterplot(data=df, x="vehicles", y="green_time", hue="weather", style="event_nearby")
-    plt.title("Green Light Time vs Vehicles & Weather")
-    plt.show()
-    
-def plot_signal_predictions(predictions):
-    signals = list(predictions.keys())
-    times = list(predictions.values())
-    colors = ['green' if t < 40 else 'orange' if t < 70 else 'red' for t in times]
-    plt.figure(figsize=(8, 4))
-    sns.barplot(x=signals, y=times, palette=colors)
-    plt.ylabel("Predicted Green Time (sec)")
-    plt.title("Traffic Signal Predictions")
-    plt.show()
+    # Case 2: regression + RL
+    base_time = regression_green_time(model, input_features)
 
-# -----------------------------
-# 4. FLASK API
-# -----------------------------
-app = Flask(__name__)
-CORS(app)
+    # State for RL = discretized total demand
+    state = min(total_cars, 49)
 
-@app.route('/predict_time', methods=['POST'])
-def predict_time():
-    data = request.json
-    time_of_day = data.get('time_of_day', 'morning')
-    vehicles = data.get('vehicles', 0)
-    foot_traffic = data.get('foot_traffic', 10)
-    weather = data.get('weather', 'sunny')
-    event = data.get('event', 0)
-    emergency = data.get('emergency', 0)
-    predicted_time = predict_green_time(
-        time_of_day,
-        vehicles,
-        foot_traffic,
-        weather,
-        event,
-        emergency
-    )
-    return jsonify({'green_time': predicted_time})
+    # RL chooses adjustment
+    action_idx = agent.choose_action(state)
+    adjustment = agent.actions[action_idx]
 
-if __name__ == '__main__':
-    app.run(debug=True)
+    # Combine baseline + adjustment
+    green_time = base_time + adjustment
+
+    # Guardrails again
+    green_time = max(3.0, min(green_time, 15.0))
+
+    return green_time, state, action_idx
+
+
+# ============================
+# Reward Function
+# ============================
+def compute_reward(ns_demand, ew_demand, green_time, direction="NS"):
+    """
+    Reward = cars cleared - cars still waiting
+    Assumption: 1 car passes per 2 seconds of green
+    """
+    if direction == "NS":
+        cleared = min(ns_demand, green_time // 2)
+        waiting = ns_demand - cleared
+    else:
+        cleared = min(ew_demand, green_time // 2)
+        waiting = ew_demand - cleared
+
+    reward = cleared - waiting
+    return reward
+
+
+# ============================
+# Training Simulation
+# ============================
+class DummyModel:
+    """Fake regression model just for demonstration"""
+    def predict(self, X):
+        return [min(15, max(3, 0.5 * X[0][0] + 5))]  # simple formula
+
+
+if __name__ == "__main__":
+    model = DummyModel()
+    agent = TrafficLightAgent()
+
+    for episode in range(100):  # simulate 100 cycles
+        ns_demand = random.randint(0, 25)
+        ew_demand = random.randint(0, 25)
+        input_features = [ns_demand + ew_demand]
+
+        # Hybrid decision
+        green_time, state, action_idx = hybrid_green_time(model, agent, input_features)
+
+        # If green_time came from RL (not fixed case)
+        if state is not None:
+            reward = compute_reward(ns_demand, ew_demand, green_time, direction="NS")
+            next_state = min((ns_demand + ew_demand) // 2, 49)
+            agent.update(state, action_idx, reward, next_state)
+
+        print(
+            f"Ep {episode+1}: NS={ns_demand}, EW={ew_demand}, Green={green_time:.1f}s"
+        )
