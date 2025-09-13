@@ -1,4 +1,4 @@
- const nsLights = document.querySelectorAll("#ns-light .light");
+    const nsLights = document.querySelectorAll("#ns-light .light");
     const ewLights = document.querySelectorAll("#ew-light .light");
     const statusText = document.getElementById("status");
     const timerDisplay = document.getElementById("timer");
@@ -11,6 +11,7 @@
     const westDensityDisplay = document.getElementById("west-density");
     
     const predictButton = document.getElementById("predictButton");
+    const autoTimerDisplay = document.getElementById("auto-timer");
 
     // ---------------------------------
     // AI INTEGRATION - Connect to Flask
@@ -79,35 +80,56 @@
 
     // Update car positions and add collision avoidance
     function updateCars() {
-      const stopDistance = 20;
+      const stopDistance = 30; // Increased for cleaner stop
 
       cars.forEach(car => {
         let isStopped = false;
 
-        // Check for intersection stop
-        if (car.lane === 'north' && car.y > canvas.height/2 - roadWidth/2 - car.height && nsStopped) isStopped = true;
-        if (car.lane === 'south' && car.y < canvas.height/2 + roadWidth/2 + car.height && nsStopped) isStopped = true;
-        if (car.lane === 'east' && car.x < canvas.width/2 + roadWidth/2 + car.width && ewStopped) isStopped = true;
-        if (car.lane === 'west' && car.x > canvas.width/2 - roadWidth/2 - car.width && ewStopped) isStopped = true;
-
-        // Check for car-to-car collision
-        if (!isStopped) {
-            for (let otherCar of cars) {
-                if (otherCar !== car && otherCar.lane === car.lane) {
-                    if (car.lane === 'north' && (car.y > otherCar.y - stopDistance && car.y < otherCar.y)) isStopped = true;
-                    if (car.lane === 'south' && (car.y < otherCar.y + stopDistance && car.y > otherCar.y)) isStopped = true;
-                    if (car.lane === 'east' && (car.x < otherCar.x + stopDistance && car.x > otherCar.x)) isStopped = true;
-                    if (car.lane === 'west' && (car.x > otherCar.x - stopDistance && car.x < otherCar.x)) isStopped = true;
-                }
-            }
+        // Intersection stop logic
+        if (car.lane === 'north') {
+          // Stop for red
+          if (
+            car.y + car.height > canvas.height/2 - roadWidth/2 - stopDistance &&
+            phases[currentPhase].ns === 'red'
+          ) isStopped = true;
         }
-        
+        if (car.lane === 'south') {
+          if (
+            car.y < canvas.height/2 + roadWidth/2 + stopDistance &&
+            phases[currentPhase].ns === 'red'
+          ) isStopped = true;
+        }
+        if (car.lane === 'east') {
+          if (
+            car.x < canvas.width/2 + roadWidth/2 + stopDistance &&
+            phases[currentPhase].ew === 'red'
+          ) isStopped = true;
+        }
+        if (car.lane === 'west') {
+          if (
+            car.x > canvas.width/2 - roadWidth/2 - stopDistance &&
+            phases[currentPhase].ew === 'red'
+          ) isStopped = true;
+        }
+
+        // Car-to-car collision avoidance (unchanged)
+        if (!isStopped) {
+          for (let otherCar of cars) {
+            if (otherCar !== car && otherCar.lane === car.lane) {
+              if (car.lane === 'north' && (car.y > otherCar.y - stopDistance && car.y < otherCar.y)) isStopped = true;
+              if (car.lane === 'south' && (car.y < otherCar.y + stopDistance && car.y > otherCar.y)) isStopped = true;
+              if (car.lane === 'east' && (car.x < otherCar.x + stopDistance && car.x > otherCar.x)) isStopped = true;
+              if (car.lane === 'west' && (car.x > otherCar.x - stopDistance && car.x < otherCar.x)) isStopped = true;
+            }
+          }
+        }
+
         // Move car if not stopped
         if (!isStopped) {
-            if (car.lane === 'north') car.y += car.speed;
-            if (car.lane === 'south') car.y -= car.speed;
-            if (car.lane === 'east') car.x -= car.speed;
-            if (car.lane === 'west') car.x += car.speed;
+          if (car.lane === 'north') car.y += car.speed;
+          if (car.lane === 'south') car.y -= car.speed;
+          if (car.lane === 'east') car.x -= car.speed;
+          if (car.lane === 'west') car.x += car.speed;
         }
       });
       
@@ -199,7 +221,7 @@
 
         ctx.beginPath();
         ctx.arc(x + 10, y + 25, 5, 0, Math.PI * 2);
-        ctx.fillStyle = color === 'yellow' ? 'yellow' : '#333';
+        ctx.fillStyle = '#333';
         ctx.fill();
 
         ctx.beginPath();
@@ -221,83 +243,144 @@
     }
 
 
-    // ---------------------------------
-    // TRAFFIC LIGHT CONTROL - Phases
-    // ---------------------------------
+    // --- Updated Signal Logic with Yellow Phase ---
+
     let phases = [
-      { id: "ns", ns: "green", ew: "red", text: "North/South Green - Go", time: 10 },
-      { id: "ns", ns: "yellow", ew: "red", text: "North/South Yellow - Ready", time: 3 },
-      { id: "ew", ns: "red", ew: "green", text: "East/West Green - Go", time: 10 },
-      { id: "ew", ns: "red", ew: "yellow", text: "East/West Yellow - Ready", time: 3 }
+      { id: "ns", ns: "green", ew: "red", text: "North/South Green - Go", time: 5 },
+      { id: "ew", ns: "red", ew: "green", text: "East/West Green - Go", time: 5 }
     ];
 
     let currentPhase = 0;
-    let timeLeft = phases[currentPhase].time;
+    let phaseTimer = phases[currentPhase].time;
     let fetchingPrediction = false;
 
-    function updateLights() {
-      // Reset all lights
-      nsLights.forEach(light => light.classList.remove("active"));
-      ewLights.forEach(light => light.classList.remove("active"));
+    // Improved: Cars stop before intersection
+    function updateCars() {
+      const stopDistance = 30; // Increased for cleaner stop
 
-      // Activate based on phase
-      nsLights.forEach(light => {
-        if (light.classList.contains(phases[currentPhase].ns)) light.classList.add("active");
+      cars.forEach(car => {
+        let isStopped = false;
+
+        // Intersection stop logic
+        if (car.lane === 'north') {
+          // Stop for red
+          if (
+            car.y + car.height > canvas.height/2 - roadWidth/2 - stopDistance &&
+            phases[currentPhase].ns === 'red'
+          ) isStopped = true;
+        }
+        if (car.lane === 'south') {
+          if (
+            car.y < canvas.height/2 + roadWidth/2 + stopDistance &&
+            phases[currentPhase].ns === 'red'
+          ) isStopped = true;
+        }
+        if (car.lane === 'east') {
+          if (
+            car.x < canvas.width/2 + roadWidth/2 + stopDistance &&
+            phases[currentPhase].ew === 'red'
+          ) isStopped = true;
+        }
+        if (car.lane === 'west') {
+          if (
+            car.x > canvas.width/2 - roadWidth/2 - stopDistance &&
+            phases[currentPhase].ew === 'red'
+          ) isStopped = true;
+        }
+
+        // Car-to-car collision avoidance
+        if (!isStopped) {
+          for (let otherCar of cars) {
+            if (otherCar !== car && otherCar.lane === car.lane) {
+              if (car.lane === 'north' && (car.y > otherCar.y - stopDistance && car.y < otherCar.y)) isStopped = true;
+              if (car.lane === 'south' && (car.y < otherCar.y + stopDistance && car.y > otherCar.y)) isStopped = true;
+              if (car.lane === 'east' && (car.x < otherCar.x + stopDistance && car.x > otherCar.x)) isStopped = true;
+              if (car.lane === 'west' && (car.x > otherCar.x - stopDistance && car.x < otherCar.x)) isStopped = true;
+            }
+          }
+        }
+
+        // Move car if not stopped
+        if (!isStopped) {
+          if (car.lane === 'north') car.y += car.speed;
+          if (car.lane === 'south') car.y -= car.speed;
+          if (car.lane === 'east') car.x -= car.speed;
+          if (car.lane === 'west') car.x += car.speed;
+        }
       });
-      ewLights.forEach(light => {
-        if (light.classList.contains(phases[currentPhase].ew)) light.classList.add("active");
-      });
-
-      // Update stop/go for the simulation
-      nsStopped = (phases[currentPhase].ns === 'red' || phases[currentPhase].ns === 'yellow');
-      ewStopped = (phases[currentPhase].ew === 'red' || phases[currentPhase].ew === 'yellow');
-
-      statusText.innerText = phases[currentPhase].text;
-      timeLeft = phases[currentPhase].time;
+      
+      // Remove cars that have left the screen
+      cars = cars.filter(car => 
+        car.x > -car.width && car.x < canvas.width + car.width &&
+        car.y > -car.height && car.y < canvas.height + car.height
+      );
     }
-
-    // Main timer to manage phases and trigger AI predictions
+    
+    // --- Signal Phase Control: cycles through green/red based on demand ---
     setInterval(async () => {
-      timeLeft--;
-      timerDisplay.innerText = timeLeft;
-
-      // Update simulation demand and density displays
       const demand = getTrafficDemand();
       nsDemandDisplay.innerText = demand.ns;
       ewDemandDisplay.innerText = demand.ew;
+
+      // Show the time remaining for the current phase
+      autoTimerDisplay.innerText = phaseTimer;
+
+      // If timer runs out, switch phase
+      phaseTimer--;
+      if (phaseTimer <= 0) {
+        // Switch to the opposite lane if its demand is higher
+        if (phases[currentPhase].id === "ns" && demand.ew > demand.ns) {
+            currentPhase = 1; // EW Green
+        } else if (phases[currentPhase].id === "ew" && demand.ns > demand.ew) {
+            currentPhase = 0; // NS Green
+        } else {
+            // Otherwise, just switch to the next phase in the loop
+            currentPhase = (currentPhase + 1) % phases.length;
+        }
+        
+        // Update lights and status immediately after phase change
+        nsLights.forEach(light => light.classList.remove("active"));
+        ewLights.forEach(light => light.classList.remove("active"));
+        nsLights.forEach(light => {
+            if (light.classList.contains(phases[currentPhase].ns)) light.classList.add("active");
+        });
+        ewLights.forEach(light => {
+            if (light.classList.contains(phases[currentPhase].ew)) light.classList.add("active");
+        });
+        statusText.innerText = phases[currentPhase].text;
+        
+        // AI prediction logic. Only trigger on the first step of a new green phase
+        if (phases[currentPhase].ns === "green" && !fetchingPrediction) {
+            const nsVehicles = cars.filter(c => c.lane === 'north' || c.lane === 'south').length;
+            console.log(`Sending AI NS traffic data: ${nsVehicles}`);
+            fetchingPrediction = true;
+            const newTime = await fetchPrediction(nsVehicles);
+            fetchingPrediction = false;
+            phases[currentPhase].time = Math.round(newTime);
+        } else if (phases[currentPhase].ew === "green" && !fetchingPrediction) {
+            const ewVehicles = cars.filter(c => c.lane === 'east' || c.lane === 'west').length;
+            console.log(`Sending AI EW traffic data: ${ewVehicles}`);
+            fetchingPrediction = true;
+            const newTime = await fetchPrediction(ewVehicles);
+            fetchingPrediction = false;
+            phases[currentPhase].time = Math.round(newTime);
+        }
+        
+        phaseTimer = phases[currentPhase].time;
+      }
+      
       const density = getTrafficDensity();
       northDensityDisplay.innerText = density.north;
       southDensityDisplay.innerText = density.south;
       eastDensityDisplay.innerText = density.east;
       westDensityDisplay.innerText = density.west;
-
-      if (timeLeft <= 0) {
-        currentPhase = (currentPhase + 1) % phases.length;
-        updateLights();
-      }
-      
-      // AI prediction logic. Only trigger on the first step of a new green phase
-      if (timeLeft === phases[currentPhase].time - 1 && !fetchingPrediction) {
-          if (phases[currentPhase].id === "ns") {
-              // Send NS traffic data to AI
-              const nsVehicles = cars.filter(c => c.lane === 'north' || c.lane === 'south').length;
-              console.log(`Sending AI NS traffic data: ${nsVehicles}`);
-              fetchingPrediction = true;
-              const newTime = await fetchPrediction(nsVehicles);
-              fetchingPrediction = false;
-              phases[currentPhase].time = Math.round(newTime); // Update the phase duration
-          } else if (phases[currentPhase].id === "ew") {
-              // Send EW traffic data to AI
-              const ewVehicles = cars.filter(c => c.lane === 'east' || c.lane === 'west').length;
-              console.log(`Sending AI EW traffic data: ${ewVehicles}`);
-              fetchingPrediction = true;
-              const newTime = await fetchPrediction(ewVehicles);
-              fetchingPrediction = false;
-              phases[currentPhase].time = Math.round(newTime); // Update the phase duration
-          }
-      }
-
     }, 1000);
 
-    updateLights(); // Initialize the first light
-    fetchPredictionAndUpdatePhase();
+    // Initial setup
+    nsLights.forEach(light => {
+      if (light.classList.contains(phases[currentPhase].ns)) light.classList.add("active");
+    });
+    ewLights.forEach(light => {
+      if (light.classList.contains(phases[currentPhase].ew)) light.classList.add("active");
+    });
+    statusText.innerText = phases[currentPhase].text;
