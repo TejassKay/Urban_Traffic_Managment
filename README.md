@@ -8,26 +8,45 @@ The goal of this project is to solve a common urban problem: traffic congestion 
 IT IS BROKEN INTO THREE DIFFERENT COMPONENTS -
 
 1) FRONTEND :
-   We are using HTML to provide the basic structure for the visuals, to create a dashboard that shows traffic lights, the timer and displays text .
-   Vanilla CSS is used to style the HTML code to make it more user interactive.
-   JS is used to make functional, it switches the red-light to green-light, makes the countdown timer work and updates demand and traffic density.
-   It is also used to connect to backend using fetch() API .
+   The frontend of this project is a real-time traffic simulation dashboard built with vanilla JavaScript, HTML, and CSS. It provides a visual representation of a traffic intersection and an interactive control panel to monitor and manage traffic flow.
 
-2) BACKEND :
-   The AI Model is made using libraries such as pandas (for handling data), sklearn(for machine learning), random(to use fake data) and flask (for making the model    a web service).
-   
-   generate_training_data() : this function basically is like a teacher for the AI, it teaches the AI different traffic scenarios (like weather, time of day, no of    cars) to predict the correct green light time for the scenario. It also teaches it the more important factors to make a better decision.
-   
-   train_signal_model() : this is a learning process, it takes the fake data and uses it in a LinearRegression model to find patterns and create a formula to          predict the green light time for different situations.
-   
-   predict_green_time(): it is a prediciton process, if u give it a new situation, it uses the learned formula to calculate best green light time duration.
+   Key Features-
+Dynamic Traffic Simulation: A <canvas> element renders a two-lane road intersection with cars moving in four directions (North, South, East, West). Cars are dynamically spawned and their movement is updated in a game loop.
 
-   Guardrails: This is a key safety feature. The AI guesses are educated guesses so they can be wrong. Guardrails are common-sense rules which overrides the AI.       for example- if a ambulance is going through it keeps the green-light on.
+Traffic Light Control: The application visually displays the North/South and East/West traffic lights. The lights change color (red, yellow, green) based on an automated cycle and real-time traffic demand.
+
+Interactive Dashboard: A dashboard provides key information about the simulation:
+
+Current Phase: Shows which direction has the green light.
+
+Time Remaining: Displays the time left in the current traffic light phase.
+
+Traffic Demand: Counts the number of cars waiting in the North/South and East/West lanes.
+
+Traffic Density: A qualitative measure (Low, Medium, High) of traffic for each direction.
+
+AI Integration: The frontend is designed to interact with a backend AI model. Clicking the "Get AI Prediction" button sends the current traffic data to the server, which can then return an optimal green light time to improve traffic flow.
+
+Responsive Design: The layout is responsive, ensuring the dashboard and simulation are readable and usable on various screen sizes.
+
+Technologies Used
+HTML5: Structures the webpage, including the dashboard and canvas elements.
+
+CSS3: Styles the user interface, including the traffic lights and dashboard panels, and provides responsive layouts.
+
+JavaScript: Manages the entire simulation logic, from car movement and light changes to data fetching from the backend.
+
+3) BACKEND :
+   The AI Model is made using libraries such as pandas (for handling data), sklearn(for machine learning), random(to use fake data) and flask (for making the model a web service).
+   
+
+   Guardrails: This is a key safety feature. The AI guesses are educated guesses so they can be wrong. Guardrails are common-sense rules which overrides the AI, for example- if a ambulance is going through     it    keeps the green-light on.
 
    flask() is used to connect to frontend, it sets up a web service so that request.json can grab the data and JSON can send back the predictions to the frontend.
 
-3) HARDWARE:
-   A physical traffic light system simulated by an Arduino mini-computer. This component receives signals from the AI backend and physically changes the traffic       lights, demonstrating a proof-of-concept for real-world application.
+3)OPEN CV MODEL :
+  
+   
 
 
 CONTRIBUTIONS :
