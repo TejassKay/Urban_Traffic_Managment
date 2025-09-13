@@ -1,5 +1,7 @@
 import numpy as np
 import random
+from flask import Flask, jsonify, request
+from flask_cors import CORS
 
 # ============================
 # Linear Regression Baseline
@@ -105,10 +107,43 @@ class DummyModel:
         return [min(15, max(3, 0.5 * X[0][0] + 5))]  # simple formula
 
 
-if __name__ == "__main__":
-    model = DummyModel()
-    agent = TrafficLightAgent()
+# ============================
+# Flask API
+# ============================
+app = Flask(__name__)
+CORS(app)
 
+# Instantiate model and agent globally for API use
+model = DummyModel()
+agent = TrafficLightAgent()
+
+def predict_green_time(time_of_day, vehicles, foot_traffic, weather, event, emergency):
+    # For demonstration, only use vehicles for RL/regression
+    input_features = [vehicles]
+    green_time, state, action_idx = hybrid_green_time(model, agent, input_features)
+    return green_time
+
+@app.route('/predict_time', methods=['POST'])
+def predict_time():
+    data = request.json
+    time_of_day = data.get('time_of_day', 'morning')
+    vehicles = data.get('vehicles', 0)
+    foot_traffic = data.get('foot_traffic', 10)
+    weather = data.get('weather', 'sunny')
+    event = data.get('event', 0)
+    emergency = data.get('emergency', 0)
+    predicted_time = predict_green_time(
+        time_of_day,
+        vehicles,
+        foot_traffic,
+        weather,
+        event,
+        emergency
+    )
+    return jsonify({'green_time': predicted_time})
+
+if __name__ == "__main__":
+    # Optional: Run training simulation for demonstration
     for episode in range(100):  # simulate 100 cycles
         ns_demand = random.randint(0, 25)
         ew_demand = random.randint(0, 25)
@@ -126,3 +161,5 @@ if __name__ == "__main__":
         print(
             f"Ep {episode+1}: NS={ns_demand}, EW={ew_demand}, Green={green_time:.1f}s"
         )
+    # Start Flask app
+    app.run(debug=True)
